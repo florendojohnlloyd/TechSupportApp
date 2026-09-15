@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Tech Support",
+    "slug": "techsupportapp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#1565C0"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.techsupport.app"
+    },
+    "android": {
+      "package": "com.techsupport.app"
+    },
+    "web": {},
+    "plugins": [
+      "expo-status-bar"
+    ]
+  }
+}
