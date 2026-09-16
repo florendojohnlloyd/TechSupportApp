@@ -19,7 +19,6 @@ import BMTicketDetailScreen from '../screens/branchmanager/BMTicketDetailScreen'
 // FSE
 import FSEDashboard from '../screens/fse/FSEDashboard';
 import FSETicketDetailScreen from '../screens/fse/FSETicketDetailScreen';
-import FSEReportsScreen from '../screens/fse/FSEReportsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -58,7 +57,6 @@ export default function AppNavigator() {
           <>
             <Stack.Screen name="FSEDashboard" component={FSEDashboard} />
             <Stack.Screen name="FSETicketDetail" component={FSETicketDetailScreen} />
-            <Stack.Screen name="FSEReports" component={FSEReportsScreen} />
           </>
         ) : (
           <Stack.Screen name="Login" component={LoginScreen} />

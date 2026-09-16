@@ -156,17 +156,9 @@ export default function FSEDashboard({ navigation }) {
             <Text style={styles.greeting}>Field Engineer</Text>
             <Text style={styles.userName}>{user?.name}</Text>
           </View>
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={styles.reportsBtn}
-              onPress={() => navigation.navigate('FSEReports')}
-            >
-              <Ionicons name="bar-chart-outline" size={20} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-              <Ionicons name="log-out-outline" size={22} color="#fff" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
+            <Ionicons name="log-out-outline" size={22} color="#fff" />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.statsRow}>
@@ -359,12 +351,6 @@ const styles = StyleSheet.create({
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   greeting: { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '500' },
   userName: { fontSize: 22, fontWeight: '800', color: '#fff', marginTop: 2 },
-  headerActions: { flexDirection: 'row', gap: spacing.sm },
-  reportsBtn: {
-    width: 42, height: 42, borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    justifyContent: 'center', alignItems: 'center',
-  },
   logoutBtn: {
     width: 42, height: 42, borderRadius: radius.md,
     backgroundColor: 'rgba(255,255,255,0.18)',

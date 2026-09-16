@@ -4,21 +4,50 @@
     "slug": "techsupportapp",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1565C0"
+      "backgroundColor": "#2563EB"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.techsupport.app"
     },
     "android": {
-      "package": "com.techsupport.app"
+      "package": "com.techsupport.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2563EB"
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
     },
-    "web": {},
     "plugins": [
-      "expo-status-bar"
-    ]
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "This app uses your location to record where a service was completed."
+        }
+      ]
+    ],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "436a1b72-8da7-4689-a8b6-8439bc684ad2"
+      }
+    },
+    "owner": "jlcflorendo",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/436a1b72-8da7-4689-a8b6-8439bc684ad2"
+    }
   }
 }

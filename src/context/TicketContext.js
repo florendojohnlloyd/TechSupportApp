@@ -1,5 +1,20 @@
 import React, { createContext, useState, useContext } from 'react';
 
+// Parts catalog from NetSuite
+export const PARTS_CATALOG = [
+  { code: 'ESPMI-0001', name: 'Thermal Print Head', category: 'Printer Parts', unit: 'pcs' },
+  { code: 'ESPMI-0002', name: 'Paper Feed Roller', category: 'Printer Parts', unit: 'pcs' },
+  { code: 'ESPMI-0003', name: 'Power Supply Board', category: 'Electronics', unit: 'pcs' },
+  { code: 'ESPMI-0003B', name: 'Power Supply Board (Backup)', category: 'Electronics', unit: 'pcs' },
+  { code: 'ESPMI-0004', name: 'Network Interface Card', category: 'Electronics', unit: 'pcs' },
+  { code: 'ESPMI-0005', name: 'Ink Cartridge Black', category: 'Consumables', unit: 'pcs' },
+  { code: 'ESPMI-0006', name: 'Ink Cartridge Color', category: 'Consumables', unit: 'set' },
+  { code: 'ESPMI-0007', name: 'Toner Cartridge', category: 'Consumables', unit: 'pcs' },
+  { code: 'ESPMI-0008', name: 'Fuser Unit', category: 'Printer Parts', unit: 'pcs' },
+  { code: 'ESPMI-0009', name: 'Drum Unit', category: 'Printer Parts', unit: 'pcs' },
+  { code: 'ESPMI-0010', name: 'Maintenance Kit', category: 'Consumables', unit: 'set' },
+];
+
 const TicketContext = createContext({});
 
 const INITIAL_TICKETS = [
@@ -133,12 +148,34 @@ export const TicketProvider = ({ children }) => {
     }));
   };
 
+  const addPartsRequest = (ticketId, partsRequest) => {
+    setTickets(prev => prev.map(t => {
+      if (t.id !== ticketId) return t;
+      return {
+        ...t,
+        partsRequests: [...(t.partsRequests || []), partsRequest],
+        updatedAt: new Date(),
+      };
+    }));
+  };
+
+  const addBudgetRequest = (ticketId, budgetRequest) => {
+    setTickets(prev => prev.map(t => {
+      if (t.id !== ticketId) return t;
+      return {
+        ...t,
+        budgetRequests: [...(t.budgetRequests || []), budgetRequest],
+        updatedAt: new Date(),
+      };
+    }));
+  };
+
   const getTicket = (ticketId) => tickets.find(t => t.id === ticketId);
 
   const getTicketsByFSE = (fseUid) => tickets.filter(t => t.assignedFSE === fseUid);
 
   return (
-    <TicketContext.Provider value={{ tickets, addTicket, updateTicket, getTicket, getTicketsByFSE }}>
+    <TicketContext.Provider value={{ tickets, addTicket, updateTicket, getTicket, getTicketsByFSE, addPartsRequest, addBudgetRequest }}>
       {children}
     </TicketContext.Provider>
   );
