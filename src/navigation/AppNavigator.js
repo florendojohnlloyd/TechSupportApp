@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, View } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
+
 import LoginScreen from '../screens/auth/LoginScreen';
 
 // Support
@@ -28,7 +29,7 @@ export default function AppNavigator() {
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#1565C0" />
+        <ActivityIndicator size="large" color="#2563EB" />
       </View>
     );
   }
@@ -37,19 +38,23 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
+          // Auth screens
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : userRole === 'support' ? (
+          // Support screens
           <>
             <Stack.Screen name="SupportDashboard" component={SupportDashboard} />
             <Stack.Screen name="CreateTicket" component={CreateTicketScreen} />
             <Stack.Screen name="TicketDetail" component={TicketDetailScreen} />
           </>
         ) : userRole === 'branch_manager' ? (
+          // Branch Manager screens
           <>
             <Stack.Screen name="BMDashboard" component={BMDashboard} />
             <Stack.Screen name="BMTicketDetail" component={BMTicketDetailScreen} />
           </>
         ) : userRole === 'fse' ? (
+          // FSE screens — all registered here
           <>
             <Stack.Screen name="FSEDashboard" component={FSEDashboard} />
             <Stack.Screen name="FSETicketDetail" component={FSETicketDetailScreen} />
