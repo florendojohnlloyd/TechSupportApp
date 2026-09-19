@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const AuthContext = createContext({});
 
 const PROFILE_KEY = '@techsupport_profile_overrides';
+const DUTY_KEY = '@techsupport_duty_status';
 
 // Demo users
 const DEMO_USERS = [
@@ -17,18 +18,30 @@ export const AuthProvider = ({ children }) => {
   const [userRole, setUserRole] = useState(null);
   const [loading] = useState(false);
   const [overrides, setOverrides] = useState({});
+  const [dutyStatus, setDutyStatus] = useState('on_duty'); // on_duty | on_break | off_duty
 
-  // Load any saved profile edits
+  // Load any saved profile edits + duty status
   useEffect(() => {
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(PROFILE_KEY);
         if (raw) setOverrides(JSON.parse(raw));
+        const duty = await AsyncStorage.getItem(DUTY_KEY);
+        if (duty === 'on_duty' || duty === 'on_break' || duty === 'off_duty') setDutyStatus(duty);
       } catch (e) {
         // ignore
       }
     })();
   }, []);
+
+  const updateDutyStatus = async (next) => {
+    setDutyStatus(next);
+    try {
+      await AsyncStorage.setItem(DUTY_KEY, next);
+    } catch (e) {
+      // ignore
+    }
+  };
 
   const login = async (email, password) => {
     const found = DEMO_USERS.find(
@@ -67,7 +80,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userRole, loading, login, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, userRole, loading, login, logout, updateProfile, dutyStatus, updateDutyStatus }}>
       {children}
     </AuthContext.Provider>
   );

@@ -270,8 +270,13 @@ export default function FSETicketDetailScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
         </View>
-        <Text style={styles.headerTicketNo}>{ticket.ticketNo}</Text>
+        <View style={styles.priorityBadge}>
+          <Text style={styles.priorityBadgeText}>
+            {ticket.concernType?.toUpperCase() || 'FIELD SERVICE'}
+          </Text>
+        </View>
         <Text style={styles.headerClient}>{ticket.clientName}</Text>
+        <Text style={styles.headerTicketNo}>{ticket.ticketNo}</Text>
       </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -400,35 +405,49 @@ export default function FSETicketDetailScreen({ route, navigation }) {
           </AnimatedCard>
         )}
 
-        {/* ── Request Buttons (only when Onsite or Pending) ── */}
+        {/* ── Field Requisitions (only when Onsite or Pending) ── */}
         {canRequest && (
-          <View style={styles.requestsRow}>
-            <PressableScale style={styles.requestBtn} onPress={() => setShowPartsModal(true)}>
-              <View style={[styles.requestBtnIcon, { backgroundColor: colors.warningBg }]}>
-                <Ionicons name="construct" size={22} color={colors.warning} />
-              </View>
-              <Text style={styles.requestBtnLabel}>Request Parts</Text>
-              {(ticket.partsRequests?.length > 0) && (
-                <View style={styles.requestCount}>
-                  <Text style={styles.requestCountText}>{ticket.partsRequests.length}</Text>
+          <>
+            <View style={styles.reqSectionRow}>
+              <Text style={styles.reqSectionTitle}>Field Requisitions</Text>
+              <View style={styles.fastPill}><Text style={styles.fastPillText}>Fast Dispatch</Text></View>
+            </View>
+            <View style={styles.reqCardsRow}>
+              {/* Parts card */}
+              <PressableScale style={[styles.reqCard, { borderColor: 'rgba(59,130,246,0.4)' }]} onPress={() => setShowPartsModal(true)}>
+                <View style={styles.reqCardTop}>
+                  <View style={[styles.reqCardIcon, { backgroundColor: colors.infoBg }]}>
+                    <Ionicons name="cube" size={20} color={colors.info} />
+                  </View>
+                  <Text style={[styles.reqTagText, { color: colors.info }]}>DIRECT DELIVERY</Text>
                 </View>
-              )}
-              <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
-            </PressableScale>
+                <Text style={styles.reqCardTitle}>Requisition of Parts</Text>
+                <Text style={styles.reqCardDesc}>Order sensors, seals, valves & equipment to job site</Text>
+                <View style={[styles.reqCardBtn, { backgroundColor: colors.infoBg, borderColor: 'rgba(59,130,246,0.3)' }]}>
+                  <Text style={[styles.reqCardBtnText, { color: colors.info }]}>
+                    + Request Parts{ticket.partsRequests?.length > 0 ? ` (${ticket.partsRequests.length})` : ''}
+                  </Text>
+                </View>
+              </PressableScale>
 
-            <PressableScale style={styles.requestBtn} onPress={() => setShowBudgetModal(true)}>
-              <View style={[styles.requestBtnIcon, { backgroundColor: colors.infoBg }]}>
-                <Ionicons name="cash" size={22} color={colors.info} />
-              </View>
-              <Text style={styles.requestBtnLabel}>Budget Request</Text>
-              {(ticket.budgetRequests?.length > 0) && (
-                <View style={[styles.requestCount, { backgroundColor: colors.info }]}>
-                  <Text style={styles.requestCountText}>{ticket.budgetRequests.length}</Text>
+              {/* Budget card */}
+              <PressableScale style={[styles.reqCard, { borderColor: 'rgba(16,185,129,0.4)' }]} onPress={() => setShowBudgetModal(true)}>
+                <View style={styles.reqCardTop}>
+                  <View style={[styles.reqCardIcon, { backgroundColor: colors.successBg }]}>
+                    <Ionicons name="cash" size={20} color={colors.success} />
+                  </View>
+                  <Text style={[styles.reqTagText, { color: colors.success }]}>MANAGER APPROVAL</Text>
                 </View>
-              )}
-              <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
-            </PressableScale>
-          </View>
+                <Text style={styles.reqCardTitle}>Requisition of Budget</Text>
+                <Text style={styles.reqCardDesc}>Request emergency funds, local hardware buys & tolls</Text>
+                <View style={[styles.reqCardBtn, { backgroundColor: colors.successBg, borderColor: 'rgba(16,185,129,0.3)' }]}>
+                  <Text style={[styles.reqCardBtnText, { color: colors.success }]}>
+                    + Request Budget{ticket.budgetRequests?.length > 0 ? ` (${ticket.budgetRequests.length})` : ''}
+                  </Text>
+                </View>
+              </PressableScale>
+            </View>
+          </>
         )}
 
         {/* ── Parts Requests List ── */}
@@ -485,9 +504,9 @@ export default function FSETicketDetailScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* ── Client Info ── */}
-        <Card styles={styles} colors={colors} icon="person-outline" title="Client" accent={ACCENT}>
-          <Row styles={styles} label="Name" value={ticket.clientName} />
+        {/* ── Site & Contact Information ── */}
+        <Card styles={styles} colors={colors} icon="business-outline" title="Site & Contact Information" accent={ACCENT}>
+          <Row styles={styles} label="Facility" value={ticket.clientName} />
           <Row styles={styles} label="Contact" value={ticket.clientContact} />
           <Row styles={styles} label="Address" value={ticket.clientAddress || 'N/A'} last />
         </Card>
@@ -776,8 +795,28 @@ const makeStyles = (colors, spacing, radius, shadow) => StyleSheet.create({
     paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.full,
   },
   headerBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  headerTicketNo: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '600' },
-  headerClient: { color: '#fff', fontSize: 24, fontWeight: '800', marginTop: 2 },
+  headerTicketNo: { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '600', marginTop: 2, letterSpacing: 0.3 },
+  headerClient: { color: '#fff', fontSize: 22, fontWeight: '800', marginTop: 4 },
+  priorityBadge: {
+    alignSelf: 'flex-start', backgroundColor: 'rgba(245,158,11,0.2)',
+    borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
+    borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 4,
+  },
+  priorityBadgeText: { color: '#FBBF24', fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
+
+  reqSectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
+  reqSectionTitle: { fontSize: 15, fontWeight: '800', color: colors.text },
+  fastPill: { backgroundColor: colors.surfaceAlt, borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 3 },
+  fastPillText: { fontSize: 11, fontWeight: '600', color: colors.textMuted },
+  reqCardsRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md },
+  reqCard: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1 },
+  reqCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
+  reqCardIcon: { width: 38, height: 38, borderRadius: radius.md, justifyContent: 'center', alignItems: 'center' },
+  reqTagText: { fontSize: 8.5, fontWeight: '800', letterSpacing: 0.4 },
+  reqCardTitle: { fontSize: 14, fontWeight: '800', color: colors.text, marginBottom: 3 },
+  reqCardDesc: { fontSize: 11, color: colors.textMuted, lineHeight: 15, marginBottom: spacing.md },
+  reqCardBtn: { borderRadius: radius.md, borderWidth: 1, paddingVertical: 9, alignItems: 'center' },
+  reqCardBtnText: { fontSize: 12, fontWeight: '700' },
   scroll: { padding: spacing.lg },
 
   scheduleBanner: {

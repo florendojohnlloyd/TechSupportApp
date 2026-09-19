@@ -56,7 +56,7 @@ const lightColors = {
   purpleBg: '#EDE9FE',
 };
 
-// ─── Dark palette (matches reference design) ─────────────────
+// ─── Dark palette — ES PRINT Field Service (exact mock values) ─────
 const darkColors = {
   mode: 'dark',
 
@@ -67,40 +67,40 @@ const darkColors = {
 
   // Gradients [start, end]
   gradientPrimary: ['#3B82F6', '#1D4ED8'],
-  gradientHeader: ['#1E3A8A', '#0F172A'],
-  gradientDanger: ['#EF4444', '#B91C1C'],
+  gradientHeader: ['#1E3A8A', '#0B1120'],
+  gradientDanger: ['#EF4444', '#DC2626'],
   gradientWarning: ['#F59E0B', '#B45309'],
   gradientSuccess: ['#10B981', '#047857'],
   gradientInfo: ['#3B82F6', '#1D4ED8'],
   gradientPurple: ['#8B5CF6', '#6D28D9'],
 
-  // Role accents
+  // Role accents (field-service blue-forward)
   support: '#3B82F6',
   manager: '#A78BFA',
-  fse: '#34D399',
+  fse: '#3B82F6',
 
-  // Neutrals
-  bg: '#0A0E1A',
-  bgElevated: '#111827',
-  surface: '#151C2C',
-  surfaceAlt: '#1E2740',
-  border: '#243049',
-  text: '#F1F5F9',
+  // Neutrals — ES PRINT palette
+  bg: '#0B1120',
+  bgElevated: '#0B1120',
+  surface: '#151F32',
+  surfaceAlt: '#1E293B',
+  border: 'rgba(255,255,255,0.10)',
+  text: '#F8FAFC',
   textMuted: '#94A3B8',
   textLight: '#64748B',
   onGradient: '#FFFFFF',
 
   // Status
   success: '#34D399',
-  successBg: '#0C3D30',
+  successBg: 'rgba(16,185,129,0.15)',
   warning: '#FBBF24',
-  warningBg: '#3D2E0C',
+  warningBg: 'rgba(245,158,11,0.15)',
   danger: '#F87171',
-  dangerBg: '#3D1414',
+  dangerBg: 'rgba(239,68,68,0.12)',
   info: '#60A5FA',
-  infoBg: '#12294D',
+  infoBg: 'rgba(59,130,246,0.15)',
   purple: '#A78BFA',
-  purpleBg: '#2A1E4D',
+  purpleBg: 'rgba(139,92,246,0.16)',
 };
 
 // Shadows depend on mode (glow for dark, soft for light)

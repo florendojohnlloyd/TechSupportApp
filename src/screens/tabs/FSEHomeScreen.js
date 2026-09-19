@@ -4,61 +4,76 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useTickets } from '../../context/TicketContext';
 import { useTheme } from '../../context/ThemeContext';
-import { getStatusColor, getStatusLabel } from '../../utils/ticketUtils';
 import { AnimatedCard, PressableScale, FadeIn } from '../../components/Animated';
 import BrandLogo from '../../components/BrandLogo';
-import { getRoleConfig } from './roleConfig';
 
-// Field-service schedule buckets (shared across roles)
+const DUTY = {
+  on_duty: { label: 'On Duty', color: '#10B981' },
+  on_break: { label: 'On Break', color: '#F59E0B' },
+  off_duty: { label: 'Off Duty', color: '#64748B' },
+};
+const DUTY_ORDER = ['on_duty', 'on_break', 'off_duty'];
+
+// Map ticket status -> mock's schedule buckets
 const bucketOf = (s) => {
   if (s === 'CLOSED') return 'done';
-  if (['ONSITE', 'SERVICE_PENDING', 'IN_ASSESSMENT', 'ESCALATED', 'ASSIGNED_FSE'].includes(s)) return 'active';
-  return 'upcoming'; // PENDING_ACCOUNTING, OPEN
+  if (s === 'ONSITE' || s === 'SERVICE_PENDING') return 'active';
+  return 'upcoming';
 };
 const timeOf = (t) => {
   const d = t.createdAt instanceof Date ? t.createdAt : new Date(t.createdAt);
   return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 };
 
-const ROLE_META = {
-  support: { role: 'Support Desk • Help Center', tag: 'SUPPORT' },
-  branch_manager: { role: 'Branch Manager • Operations', tag: 'MANAGER' },
-  fse: { role: 'Senior Field Tech • Dallas Zone B', tag: 'FIELD SERVICE' },
-};
-
-export default function HomeScreen({ navigation }) {
+export default function FSEHomeScreen({ navigation }) {
   const { colors, spacing, radius, shadow } = useTheme();
-  const { user } = useAuth();
-  const { tickets, getTicketsByFSE } = useTickets();
-  const cfg = getRoleConfig(user?.role, colors);
-  const meta = ROLE_META[user?.role] || ROLE_META.support;
-  const styles = React.useMemo(() => makeStyles(colors, spacing, radius, shadow, cfg.accent), [colors, cfg.accent]);
+  const { user, dutyStatus, updateDutyStatus } = useAuth();
+  const { getTicketsByFSE, updateTicket } = useTickets();
+  const styles = React.useMemo(() => makeStyles(colors, spacing, radius, shadow), [colors]);
 
   const [filter, setFilter] = useState('all');
-
-  const myTickets = cfg.scope === 'mine' ? getTicketsByFSE(user?.uid) : tickets;
-
-  const counts = {
-    all: myTickets.length,
-    active: myTickets.filter(t => bucketOf(t.status) === 'active').length,
-    upcoming: myTickets.filter(t => bucketOf(t.status) === 'upcoming').length,
-    done: myTickets.filter(t => bucketOf(t.status) === 'done').length,
-  };
-  const filtered = filter === 'all' ? myTickets : myTickets.filter(t => bucketOf(t.status) === filter);
 
   const badgeFor = (s) => {
     const b = bucketOf(s);
     if (b === 'done') return { text: 'Done', bg: colors.successBg, color: colors.success };
     if (b === 'active') return { text: 'Active', bg: colors.infoBg, color: colors.info };
-    return { text: getStatusLabel(s), bg: colors.surfaceAlt, color: colors.textMuted };
+    return { text: 'Scheduled', bg: colors.surfaceAlt, color: colors.textMuted };
   };
 
+  const jobs = getTicketsByFSE(user?.uid);
+  const counts = {
+    all: jobs.length,
+    active: jobs.filter(j => bucketOf(j.status) === 'active').length,
+    upcoming: jobs.filter(j => bucketOf(j.status) === 'upcoming').length,
+    done: jobs.filter(j => bucketOf(j.status) === 'done').length,
+  };
+  const filtered = filter === 'all' ? jobs : jobs.filter(j => bucketOf(j.status) === filter);
+
+  const duty = DUTY[dutyStatus] || DUTY.on_duty;
+  const cycleDuty = () => {
+    const idx = DUTY_ORDER.indexOf(dutyStatus);
+    updateDutyStatus(DUTY_ORDER[(idx + 1) % DUTY_ORDER.length]);
+  };
+
+  const initials = (user?.name || 'U').split(' ').map(w => w[0])[0]?.toUpperCase() || 'A';
+  const firstName = (user?.name || 'Technician').split(' ')[0];
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  const firstName = (user?.name || 'User').split(' ')[0];
-  const initials = (user?.name || 'U').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 
-  const openTicket = (id) => navigation.navigate('Tickets', { screen: cfg.detailRoute, params: { ticketId: id } });
+  const openTicket = (id) => navigation.navigate('FSETicketDetail', { ticketId: id });
+
+  const acceptTicket = (job) => {
+    Alert.alert('Accept Ticket', `Accept ${job.ticketNo} and start onsite service?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Accept',
+        onPress: () => updateTicket(job.id, { status: 'ONSITE' }, {
+          status: 'ONSITE', note: `${user.name} accepted the ticket. Dispatch notified.`,
+          by: user.name, at: new Date().toISOString(),
+        }),
+      },
+    ]);
+  };
 
   const FILTERS = [
     { key: 'all', label: `All (${counts.all})` },
@@ -72,40 +87,42 @@ export default function HomeScreen({ navigation }) {
       {/* Brand top bar */}
       <View style={styles.brandBar}>
         <BrandLogo width={130} height={30} />
-        <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
+        <TouchableOpacity
+          style={[styles.dutyPill, { backgroundColor: duty.color + '22', borderColor: duty.color + '55' }]}
+          onPress={cycleDuty}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.dutyDot, { backgroundColor: duty.color }]} />
+          <Text style={[styles.dutyLabel, { color: duty.color }]}>{duty.label}</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Tech/role header */}
+        {/* Tech header */}
         <FadeIn>
           <View style={styles.techHeader}>
             <View style={styles.techInfo}>
-              <View style={styles.avatarLg}><Text style={styles.avatarLgText}>{initials}</Text></View>
+              <View style={styles.avatarWrap}>
+                <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
+                <View style={[styles.dutyIndicator, { backgroundColor: duty.color }]} />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.greeting}>{greet}, {firstName} 👋</Text>
-                <Text style={styles.role}>{meta.role}</Text>
+                <Text style={styles.role}>Senior Field Tech • Dallas Zone B</Text>
               </View>
             </View>
             <View style={styles.serviceTag}>
-              <Text style={styles.serviceTagText}>{meta.tag}</Text>
+              <Text style={styles.serviceTagText}>FIELD SERVICE</Text>
             </View>
           </View>
         </FadeIn>
 
-        {/* Quick action: create (support) */}
-        {cfg.canCreate && (
-          <AnimatedCard index={0}>
-            <PressableScale style={styles.createBtn} onPress={() => navigation.navigate('CreateTicket')}>
-              <Ionicons name="add-circle" size={20} color="#fff" />
-              <Text style={styles.createBtnText}>Create New Ticket</Text>
-            </PressableScale>
-          </AnimatedCard>
-        )}
-
         {/* Today's Schedule */}
         <View style={styles.sectionRow}>
           <Text style={styles.sectionTitle}>Today's Schedule</Text>
-          <View style={styles.countBadge}><Text style={styles.countBadgeText}>{counts.all} Orders</Text></View>
+          <View style={styles.countBadge}>
+            <Text style={styles.countBadgeText}>{counts.all} Orders</Text>
+          </View>
         </View>
 
         {/* Filter chips */}
@@ -124,42 +141,64 @@ export default function HomeScreen({ navigation }) {
         {filtered.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="clipboard-outline" size={44} color={colors.textLight} />
-            <Text style={styles.emptyText}>No tickets in this view</Text>
+            <Text style={styles.emptyText}>No orders in this view</Text>
           </View>
-        ) : filtered.map((t, i) => {
-          const bucket = bucketOf(t.status);
-          const badge = badgeFor(t.status);
+        ) : filtered.map((job, i) => {
+          const bucket = bucketOf(job.status);
+          const badge = badgeFor(job.status);
+          const canAccept = job.status === 'ASSIGNED_FSE';
           const inProgress = bucket === 'active';
           return (
-            <AnimatedCard key={t.id} index={i}>
-              <TouchableOpacity activeOpacity={0.85} onPress={() => openTicket(t.id)} style={[styles.jobCard, inProgress && styles.jobCardActive]}>
+            <AnimatedCard key={job.id} index={i}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => openTicket(job.id)}
+                style={[styles.jobCard, inProgress && styles.jobCardActive]}
+              >
                 <View style={styles.jobRow}>
+                  {/* Left time column */}
                   <View style={styles.timeCol}>
-                    <Text style={styles.timeMain}>{timeOf(t)}</Text>
+                    <Text style={styles.timeMain}>{timeOf(job)}</Text>
                     <Text style={[styles.timeTag, inProgress && { color: colors.info }]}>
                       {bucket === 'done' ? 'Completed' : bucket === 'active' ? 'In Progress' : 'Next Up'}
                     </Text>
                   </View>
+
+                  {/* Details */}
                   <View style={{ flex: 1 }}>
                     <View style={styles.jobHeader}>
-                      <Text style={styles.jobTitle} numberOfLines={1}>{t.clientName}</Text>
+                      <Text style={styles.jobTitle} numberOfLines={1}>{job.clientName}</Text>
                       <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
                         <Text style={[styles.statusBadgeText, { color: badge.color }]}>{badge.text}</Text>
                       </View>
                     </View>
-                    <Text style={styles.jobSub} numberOfLines={1}>{t.concern}</Text>
+                    <Text style={styles.jobSub} numberOfLines={1}>{job.concern}</Text>
                     <View style={styles.jobFooter}>
-                      <Text style={styles.jobNo}>{t.ticketNo}</Text>
-                      {t.assignedFSEName ? (
-                        <Text style={styles.estText}>{t.assignedFSEName}</Text>
-                      ) : t.scheduledDate ? (
-                        <Text style={styles.estText}>{t.scheduledDate}</Text>
+                      <Text style={styles.jobNo}>{job.ticketNo}</Text>
+                      {inProgress ? (
+                        <Text style={styles.slaText}>SLA: 1h 45m left</Text>
+                      ) : job.scheduledDate ? (
+                        <Text style={styles.estText}>{job.scheduledDate}</Text>
                       ) : null}
                     </View>
-                    <PressableScale style={styles.openBtn} onPress={() => openTicket(t.id)}>
-                      <Ionicons name="open-outline" size={15} color="#fff" />
-                      <Text style={styles.openBtnText}>Open Ticket</Text>
-                    </PressableScale>
+
+                    {/* Action */}
+                    {canAccept ? (
+                      <PressableScale style={styles.acceptBtn} onPress={() => acceptTicket(job)}>
+                        <Ionicons name="flash" size={13} color="#fff" />
+                        <Text style={styles.acceptBtnText}>Accept Ticket</Text>
+                      </PressableScale>
+                    ) : inProgress ? (
+                      <PressableScale style={styles.progressBtn} onPress={() => openTicket(job.id)}>
+                        <View style={styles.pulseDot} />
+                        <Text style={styles.progressBtnText}>On-Site In Progress • View Logs</Text>
+                      </PressableScale>
+                    ) : (
+                      <View style={styles.doneBtn}>
+                        <Ionicons name="checkmark" size={13} color={colors.success} />
+                        <Text style={styles.doneBtnText}>Completed</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
               </TouchableOpacity>
@@ -173,28 +212,28 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
-const makeStyles = (colors, spacing, radius, shadow, accent) => StyleSheet.create({
+const makeStyles = (colors, spacing, radius, shadow) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   brandBar: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingTop: 54, paddingHorizontal: 20, paddingBottom: 14,
     borderBottomWidth: 1, borderBottomColor: colors.border,
   },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: accent, justifyContent: 'center', alignItems: 'center' },
-  avatarText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  dutyPill: { flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  dutyDot: { width: 8, height: 8, borderRadius: 4 },
+  dutyLabel: { fontSize: 12, fontWeight: '700' },
 
   scroll: { padding: 20 },
   techHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 },
   techInfo: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  avatarLg: { width: 44, height: 44, borderRadius: 22, backgroundColor: accent, justifyContent: 'center', alignItems: 'center' },
-  avatarLgText: { color: '#fff', fontWeight: '800', fontSize: 18 },
+  avatarWrap: { position: 'relative' },
+  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
+  avatarText: { color: '#fff', fontWeight: '800', fontSize: 18 },
+  dutyIndicator: { position: 'absolute', bottom: -1, right: -1, width: 13, height: 13, borderRadius: 7, borderWidth: 2, borderColor: colors.bg },
   greeting: { fontSize: 16, fontWeight: '800', color: colors.text },
   role: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   serviceTag: { backgroundColor: colors.dangerBg, borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   serviceTagText: { color: colors.danger, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
-
-  createBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: accent, borderRadius: radius.md, paddingVertical: 14, marginBottom: 20, ...shadow.glow(accent) },
-  createBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
@@ -203,7 +242,7 @@ const makeStyles = (colors, spacing, radius, shadow, accent) => StyleSheet.creat
 
   chipRow: { gap: 8, paddingBottom: 16 },
   chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.surface, marginRight: 8, borderWidth: 1, borderColor: colors.border },
-  chipActive: { backgroundColor: accent, borderColor: accent },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { fontSize: 13, color: colors.textMuted, fontWeight: '600' },
   chipTextActive: { color: '#fff', fontWeight: '700' },
 
@@ -220,9 +259,16 @@ const makeStyles = (colors, spacing, radius, shadow, accent) => StyleSheet.creat
   jobSub: { fontSize: 12, color: colors.textMuted, marginBottom: 8 },
   jobFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   jobNo: { fontSize: 11, color: colors.textLight, fontWeight: '600' },
+  slaText: { fontSize: 11, color: colors.warning, fontWeight: '700' },
   estText: { fontSize: 11, color: colors.textLight, fontWeight: '600' },
-  openBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: accent, borderRadius: 10, paddingVertical: 10 },
-  openBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+
+  acceptBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#EF4444', borderRadius: 10, paddingVertical: 10 },
+  acceptBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  progressBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.infoBg, borderWidth: 1, borderColor: 'rgba(59,130,246,0.3)', borderRadius: 10, paddingVertical: 10 },
+  pulseDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary },
+  progressBtnText: { color: colors.info, fontSize: 12, fontWeight: '700' },
+  doneBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.successBg, borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)', borderRadius: 10, paddingVertical: 10 },
+  doneBtnText: { color: colors.success, fontSize: 12, fontWeight: '700' },
 
   empty: { alignItems: 'center', paddingVertical: 50, gap: 10 },
   emptyText: { fontSize: 14, color: colors.textLight },

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  KeyboardAvoidingView, Platform, ScrollView, TextInput, Image,
+  KeyboardAvoidingView, Platform, ScrollView, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import BrandLogo from '../../components/BrandLogo';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -58,9 +59,7 @@ export default function LoginScreen() {
         {/* Brand */}
         <FadeIn delay={80}>
           <View style={styles.brand}>
-            <View style={styles.logoChip}>
-              <Image source={require('../../../assets/brand-logo.png')} style={styles.logoImg} resizeMode="contain" />
-            </View>
+            <BrandLogo width={240} height={78} style={styles.logoImg} />
             <Text style={styles.brandSub}>Fast Help. Better Support.</Text>
           </View>
         </FadeIn>
@@ -154,12 +153,7 @@ const makeStyles = (colors, spacing, radius, shadow) => StyleSheet.create({
   },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: spacing.xxl },
   brand: { alignItems: 'center', marginBottom: spacing.xxxl },
-  logoChip: {
-    backgroundColor: '#FFFFFF', borderRadius: radius.xl,
-    paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
-    marginBottom: spacing.lg, ...shadow.glow(colors.primary),
-  },
-  logoImg: { width: 220, height: 72 },
+  logoImg: { marginBottom: spacing.lg },
   brandSub: { fontSize: 14, color: colors.textMuted, marginTop: 4 },
   card: {
     backgroundColor: colors.surface, borderRadius: radius.xxl, padding: spacing.xxl,
