@@ -4,16 +4,20 @@ import {
   Alert, TextInput, Modal, FlatList, ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useAuth } from '../../context/AuthContext';
 import { useTickets } from '../../context/TicketContext';
 import { PARTS_CATALOG } from '../../context/TicketContext';
+import { useTheme } from '../../context/ThemeContext';
 import { getStatusColor, getStatusBg, getStatusLabel } from '../../utils/ticketUtils';
-import { colors, spacing, radius, shadow } from '../../theme';
-
-const ACCENT = colors.fse;
+import { AnimatedCard, PressableScale } from '../../components/Animated';
 
 export default function FSETicketDetailScreen({ route, navigation }) {
+  const { colors, spacing, radius, shadow, isDark } = useTheme();
+  const ACCENT = colors.fse;
+  const styles = React.useMemo(() => makeStyles(colors, spacing, radius, shadow), [colors]);
+
   const { ticketId } = route.params;
   const { user } = useAuth();
   const { getTicket, updateTicket, addPartsRequest, addBudgetRequest } = useTickets();
@@ -50,35 +54,15 @@ export default function FSETicketDetailScreen({ route, navigation }) {
     }
   }, [ticket?.id]);
 
-  if (!ticket) return <View style={styles.center}><Text>Ticket not found.</Text></View>;
+  if (!ticket) return <View style={styles.center}><Text style={{ color: colors.text }}>Ticket not found.</Text></View>;
 
   const update = (status, note, extra = {}) => {
     updateTicket(ticketId, { status, ...extra },
       { status, note, by: user.name, at: new Date().toISOString() });
   };
 
-  // ─── Service Actions ────────────────────────────────────────
-  const handleStartOnsite = () => {
-    Alert.alert('Start Onsite', 'Begin onsite service for this ticket?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Start', onPress: () => update('ONSITE', `${user.name} started onsite service`) },
-    ]);
-  };
-
-  const handleMarkOngoing = () => {
-    Alert.alert('Mark as Ongoing', 'Update status to ongoing for client?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Confirm', onPress: () => update('ONSITE', `${user.name} marked service as ongoing`) },
-    ]);
-  };
-
-  const handleServiceDone = async () => {
-    if (!serviceNote.trim()) {
-      Alert.alert('Required', 'Please add your service findings.');
-      return;
-    }
-    // Get location
-    setLocating(true);
+  // ─── Location helper ─────────────────────────────────────────
+  const captureLocation = async () => {
     let locationStr = 'Location not available';
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -89,11 +73,7 @@ export default function FSETicketDetailScreen({ route, navigation }) {
           longitude: loc.coords.longitude,
         });
         if (address) {
-          locationStr = [
-            address.street,
-            address.city,
-            address.region,
-          ].filter(Boolean).join(', ');
+          locationStr = [address.street, address.city, address.region].filter(Boolean).join(', ');
         } else {
           locationStr = `${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`;
         }
@@ -101,28 +81,69 @@ export default function FSETicketDetailScreen({ route, navigation }) {
     } catch (e) {
       locationStr = 'Could not get location';
     }
-    setLocating(false);
+    return locationStr;
+  };
 
-    Alert.alert(
-      'Mark as Done',
-      `Location: ${locationStr}\n\nMark this ticket as completed?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Mark Done',
-          onPress: () => update(
-            'CLOSED',
-            `Service completed. Findings: ${serviceNote}`,
-            {
-              closedBy: user.name,
-              serviceFindings: serviceNote,
-              closedLocation: locationStr,
-              closedAt: new Date().toISOString(),
-            }
-          ),
-        },
-      ]
-    );
+  // ─── Service Actions ────────────────────────────────────────
+  const handleStartOnsite = () => {
+    Alert.alert('Start Onsite', 'Begin onsite service for this ticket?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Start', onPress: () => update('ONSITE', `${user.name} started onsite service`) },
+    ]);
+  };
+
+  const handleMarkOngoing = async () => {
+    setLocating(true);
+    const locationStr = await captureLocation();
+    setLocating(false);
+    Alert.alert('Mark as Ongoing', `Location: ${locationStr}\n\nUpdate status to ongoing for client?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Confirm',
+        onPress: () => update('ONSITE', `${user.name} marked service as ongoing`, {
+          ongoingLocation: locationStr,
+          ongoingAt: new Date().toISOString(),
+        }),
+      },
+    ]);
+  };
+
+  const handleArrival = async () => {
+    setLocating(true);
+    const locationStr = await captureLocation();
+    setLocating(false);
+    Alert.alert('On Arrival to Client', `Location: ${locationStr}\n\nMark arrival at client site?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Confirm',
+        onPress: () => update('ONSITE', `${user.name} arrived at client site`, {
+          arrivalLocation: locationStr,
+          arrivalAt: new Date().toISOString(),
+        }),
+      },
+    ]);
+  };
+
+  const handleServiceDone = async () => {
+    if (!serviceNote.trim()) {
+      Alert.alert('Required', 'Please add your service findings.');
+      return;
+    }
+    setLocating(true);
+    const locationStr = await captureLocation();
+    setLocating(false);
+    Alert.alert('Mark as Done', `Location: ${locationStr}\n\nMark this ticket as completed?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Mark Done',
+        onPress: () => update('CLOSED', `Service completed. Findings: ${serviceNote}`, {
+          closedBy: user.name,
+          serviceFindings: serviceNote,
+          closedLocation: locationStr,
+          closedAt: new Date().toISOString(),
+        }),
+      },
+    ]);
   };
 
   const handleServicePending = () => {
@@ -144,9 +165,7 @@ export default function FSETicketDetailScreen({ route, navigation }) {
   const togglePart = (part) => {
     setSelectedParts(prev => {
       const exists = prev.find(p => p.code === part.code);
-      if (exists) {
-        return prev.filter(p => p.code !== part.code);
-      }
+      if (exists) return prev.filter(p => p.code !== part.code);
       return [...prev, { ...part, qty: 1 }];
     });
   };
@@ -211,10 +230,33 @@ export default function FSETicketDetailScreen({ route, navigation }) {
   const isClosed = ticket.status === 'CLOSED';
   const canRequest = isOnsite || isPending;
 
+  // ─── Service phase (drives sequential buttons) ───────────────
+  // ASSIGNED → start | onsite w/o ongoing → ongoing | ongoing w/o arrival → arrival | arrival → done
+  let phase = null;
+  if (isAssigned) phase = 'start';
+  else if (isOnsite && !ticket.ongoingAt) phase = 'ongoing';
+  else if (isOnsite && ticket.ongoingAt && !ticket.arrivalAt) phase = 'arrival';
+  else if (isOnsite && ticket.arrivalAt) phase = 'done';
+  else if (isPending) phase = 'done';
+
+  const STEPS = [
+    { key: 'start', label: 'Start Onsite', done: isOnsite || isPending || isClosed },
+    { key: 'ongoing', label: 'Ongoing', done: !!ticket.ongoingAt },
+    { key: 'arrival', label: 'Arrival', done: !!ticket.arrivalAt },
+    { key: 'done', label: 'Done', done: isClosed },
+  ];
+
+  const gradFor = (c) => [c, c];
+
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: getStatusColor(ticket.status) }]}>
+      <LinearGradient
+        colors={[getStatusColor(ticket.status), getStatusColor(ticket.status) + 'CC']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <View style={styles.headerTop}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={22} color="#fff" />
@@ -225,28 +267,54 @@ export default function FSETicketDetailScreen({ route, navigation }) {
         </View>
         <Text style={styles.headerTicketNo}>{ticket.ticketNo}</Text>
         <Text style={styles.headerClient}>{ticket.clientName}</Text>
-      </View>
+      </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
         {/* Scheduled Visit Banner */}
         {ticket.scheduledDate && !isClosed && (
-          <View style={styles.scheduleBanner}>
+          <AnimatedCard index={0} style={styles.scheduleBanner}>
             <Ionicons name="calendar" size={20} color={colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={styles.scheduleBannerTitle}>Scheduled Visit</Text>
               <Text style={styles.scheduleBannerDate}>{ticket.scheduledDate}</Text>
             </View>
-          </View>
+          </AnimatedCard>
         )}
 
         {/* ── Service Actions ── */}
         {!isClosed && (
-          <View style={styles.actionsCard}>
+          <AnimatedCard index={1} style={styles.actionsCard}>
             <Text style={styles.actionsTitle}>Service Actions</Text>
 
-            {isAssigned && (
+            {/* Step progress */}
+            <View style={styles.stepper}>
+              {STEPS.map((s, i) => {
+                const active = s.key === phase;
+                return (
+                  <React.Fragment key={s.key}>
+                    <View style={styles.stepItem}>
+                      <View style={[
+                        styles.stepDot,
+                        s.done && { backgroundColor: colors.success, borderColor: colors.success },
+                        active && !s.done && { borderColor: ACCENT, backgroundColor: colors.surface },
+                      ]}>
+                        {s.done
+                          ? <Ionicons name="checkmark" size={12} color="#fff" />
+                          : <Text style={[styles.stepNum, active && { color: ACCENT }]}>{i + 1}</Text>}
+                      </View>
+                      <Text style={[styles.stepLabel, (active || s.done) && { color: colors.text, fontWeight: '700' }]}>{s.label}</Text>
+                    </View>
+                    {i < STEPS.length - 1 && <View style={[styles.stepLine, s.done && { backgroundColor: colors.success }]} />}
+                  </React.Fragment>
+                );
+              })}
+            </View>
+
+            {/* Sequential primary action — one at a time */}
+            {phase === 'start' && (
               <ActionBtn
+                styles={styles} colors={colors}
                 icon="car"
                 label="Start Onsite Service"
                 color={colors.info}
@@ -254,16 +322,29 @@ export default function FSETicketDetailScreen({ route, navigation }) {
               />
             )}
 
-            {isOnsite && (
+            {phase === 'ongoing' && (
               <ActionBtn
-                icon="refresh-circle"
-                label="Mark as Ongoing to Client"
+                styles={styles} colors={colors}
+                icon={locating ? 'hourglass' : 'refresh-circle'}
+                label={locating ? 'Getting location...' : 'Mark as Ongoing to Client'}
                 color={colors.primary}
+                disabled={locating}
                 onPress={handleMarkOngoing}
               />
             )}
 
-            {(isOnsite || isPending) && (
+            {phase === 'arrival' && (
+              <ActionBtn
+                styles={styles} colors={colors}
+                icon={locating ? 'hourglass' : 'location'}
+                label={locating ? 'Getting location...' : 'On Arrival to Client'}
+                color={colors.info}
+                disabled={locating}
+                onPress={handleArrival}
+              />
+            )}
+
+            {phase === 'done' && (
               <>
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>
@@ -279,17 +360,14 @@ export default function FSETicketDetailScreen({ route, navigation }) {
                   />
                 </View>
                 <ActionBtn
+                  styles={styles} colors={colors}
                   icon={locating ? 'hourglass' : 'checkmark-circle'}
                   label={locating ? 'Getting location...' : 'Mark as Service Done'}
                   color={colors.success}
                   disabled={locating}
                   onPress={handleServiceDone}
                 />
-              </>
-            )}
 
-            {isOnsite && (
-              <>
                 <View style={styles.divider}><Text style={styles.dividerText}>OR</Text></View>
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>
@@ -305,6 +383,7 @@ export default function FSETicketDetailScreen({ route, navigation }) {
                   />
                 </View>
                 <ActionBtn
+                  styles={styles} colors={colors}
                   icon="hourglass"
                   label="Mark as Service Pending"
                   color={colors.warning}
@@ -313,17 +392,13 @@ export default function FSETicketDetailScreen({ route, navigation }) {
                 />
               </>
             )}
-          </View>
+          </AnimatedCard>
         )}
 
         {/* ── Request Buttons (only when Onsite or Pending) ── */}
         {canRequest && (
           <View style={styles.requestsRow}>
-            <TouchableOpacity
-              style={styles.requestBtn}
-              onPress={() => setShowPartsModal(true)}
-              activeOpacity={0.8}
-            >
+            <PressableScale style={styles.requestBtn} onPress={() => setShowPartsModal(true)}>
               <View style={[styles.requestBtnIcon, { backgroundColor: colors.warningBg }]}>
                 <Ionicons name="construct" size={22} color={colors.warning} />
               </View>
@@ -334,13 +409,9 @@ export default function FSETicketDetailScreen({ route, navigation }) {
                 </View>
               )}
               <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
-            </TouchableOpacity>
+            </PressableScale>
 
-            <TouchableOpacity
-              style={styles.requestBtn}
-              onPress={() => setShowBudgetModal(true)}
-              activeOpacity={0.8}
-            >
+            <PressableScale style={styles.requestBtn} onPress={() => setShowBudgetModal(true)}>
               <View style={[styles.requestBtnIcon, { backgroundColor: colors.infoBg }]}>
                 <Ionicons name="cash" size={22} color={colors.info} />
               </View>
@@ -351,7 +422,7 @@ export default function FSETicketDetailScreen({ route, navigation }) {
                 </View>
               )}
               <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
-            </TouchableOpacity>
+            </PressableScale>
           </View>
         )}
 
@@ -410,20 +481,20 @@ export default function FSETicketDetailScreen({ route, navigation }) {
         )}
 
         {/* ── Client Info ── */}
-        <Card icon="person-outline" title="Client" accent={ACCENT}>
-          <Row label="Name" value={ticket.clientName} />
-          <Row label="Contact" value={ticket.clientContact} />
-          <Row label="Address" value={ticket.clientAddress || 'N/A'} last />
+        <Card styles={styles} colors={colors} icon="person-outline" title="Client" accent={ACCENT}>
+          <Row styles={styles} label="Name" value={ticket.clientName} />
+          <Row styles={styles} label="Contact" value={ticket.clientContact} />
+          <Row styles={styles} label="Address" value={ticket.clientAddress || 'N/A'} last />
         </Card>
 
         {/* ── Equipment ── */}
-        <Card icon="hardware-chip-outline" title="Equipment" accent={ACCENT}>
-          <Row label="Model" value={ticket.productModel || 'N/A'} />
-          <Row label="Serial" value={ticket.serialNo || 'N/A'} last />
+        <Card styles={styles} colors={colors} icon="hardware-chip-outline" title="Equipment" accent={ACCENT}>
+          <Row styles={styles} label="Model" value={ticket.productModel || 'N/A'} />
+          <Row styles={styles} label="Serial" value={ticket.serialNo || 'N/A'} last />
         </Card>
 
         {/* ── Concern ── */}
-        <Card icon="alert-circle-outline" title="Concern" accent={ACCENT}>
+        <Card styles={styles} colors={colors} icon="alert-circle-outline" title="Concern" accent={ACCENT}>
           <View style={[styles.typeTag, { backgroundColor: colors.successBg }]}>
             <Text style={[styles.typeTagText, { color: ACCENT }]}>{ticket.concernType}</Text>
           </View>
@@ -431,18 +502,24 @@ export default function FSETicketDetailScreen({ route, navigation }) {
         </Card>
 
         {/* ── Banners ── */}
+        {ticket.ongoingLocation && (
+          <InfoBanner styles={styles} icon="navigate" color={colors.primary} bg={colors.primaryLight} title="Ongoing at Location" text={ticket.ongoingLocation} />
+        )}
+        {ticket.arrivalLocation && (
+          <InfoBanner styles={styles} icon="location" color={colors.info} bg={colors.infoBg} title="Arrived at Location" text={ticket.arrivalLocation} />
+        )}
         {ticket.pendingReason && (
-          <InfoBanner icon="warning" color={colors.warning} bg={colors.warningBg} title="Pending Reason" text={ticket.pendingReason} />
+          <InfoBanner styles={styles} icon="warning" color={colors.warning} bg={colors.warningBg} title="Pending Reason" text={ticket.pendingReason} />
         )}
         {isClosed && ticket.serviceFindings && (
-          <InfoBanner icon="checkmark-circle" color={colors.success} bg={colors.successBg} title="Service Findings" text={ticket.serviceFindings} />
+          <InfoBanner styles={styles} icon="checkmark-circle" color={colors.success} bg={colors.successBg} title="Service Findings" text={ticket.serviceFindings} />
         )}
         {isClosed && ticket.closedLocation && (
-          <InfoBanner icon="location" color={colors.info} bg={colors.infoBg} title="Closed at Location" text={ticket.closedLocation} />
+          <InfoBanner styles={styles} icon="location" color={colors.info} bg={colors.infoBg} title="Closed at Location" text={ticket.closedLocation} />
         )}
 
         {/* ── Activity Timeline ── */}
-        <Card icon="time-outline" title="Activity Timeline" accent={ACCENT}>
+        <Card styles={styles} colors={colors} icon="time-outline" title="Activity Timeline" accent={ACCENT}>
           {(ticket.history || []).slice().reverse().map((h, i, arr) => (
             <View key={i} style={styles.timelineItem}>
               <View style={styles.timelineLeft}>
@@ -474,7 +551,6 @@ export default function FSETicketDetailScreen({ route, navigation }) {
               </TouchableOpacity>
             </View>
 
-            {/* Search */}
             <View style={styles.searchBox}>
               <Ionicons name="search" size={16} color={colors.textLight} />
               <TextInput
@@ -486,7 +562,6 @@ export default function FSETicketDetailScreen({ route, navigation }) {
               />
             </View>
 
-            {/* Parts List */}
             <FlatList
               data={filteredParts}
               keyExtractor={p => p.code}
@@ -523,7 +598,6 @@ export default function FSETicketDetailScreen({ route, navigation }) {
               }}
             />
 
-            {/* Selected Summary */}
             {selectedParts.length > 0 && (
               <View style={styles.selectedSummary}>
                 <Text style={styles.selectedSummaryText}>
@@ -532,7 +606,6 @@ export default function FSETicketDetailScreen({ route, navigation }) {
               </View>
             )}
 
-            {/* Reason */}
             <TextInput
               placeholder="Reason for parts request (optional)..."
               placeholderTextColor={colors.textLight}
@@ -545,10 +618,7 @@ export default function FSETicketDetailScreen({ route, navigation }) {
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowPartsModal(false)}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.submitBtn, { backgroundColor: colors.warning }]}
-                onPress={submitPartsRequest}
-              >
+              <TouchableOpacity style={[styles.submitBtn, { backgroundColor: colors.warning }]} onPress={submitPartsRequest}>
                 <Ionicons name="send" size={16} color="#fff" />
                 <Text style={styles.submitBtnText}>Submit Request</Text>
               </TouchableOpacity>
@@ -570,36 +640,22 @@ export default function FSETicketDetailScreen({ route, navigation }) {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <BudgetField
-                label="Requesting Officer"
-                icon="person-outline"
+              <BudgetField styles={styles} colors={colors} label="Requesting Officer" icon="person-outline"
                 value={budgetForm.requestingOfficer}
                 onChangeText={v => setBudgetForm(p => ({ ...p, requestingOfficer: v }))}
-                placeholder="Your name"
-              />
-              <BudgetField
-                label="Client Name"
-                icon="business-outline"
+                placeholder="Your name" />
+              <BudgetField styles={styles} colors={colors} label="Client Name" icon="business-outline"
                 value={budgetForm.clientName}
                 onChangeText={v => setBudgetForm(p => ({ ...p, clientName: v }))}
-                placeholder="Client / Company name"
-              />
-              <BudgetField
-                label="Purpose"
-                icon="clipboard-outline"
+                placeholder="Client / Company name" />
+              <BudgetField styles={styles} colors={colors} label="Purpose" icon="clipboard-outline"
                 value={budgetForm.purpose}
                 onChangeText={v => setBudgetForm(p => ({ ...p, purpose: v }))}
-                placeholder="What is this budget for?"
-                multiline
-              />
-              <BudgetField
-                label="Amount (₱)"
-                icon="cash-outline"
+                placeholder="What is this budget for?" multiline />
+              <BudgetField styles={styles} colors={colors} label="Amount (₱)" icon="cash-outline"
                 value={budgetForm.amount}
                 onChangeText={v => setBudgetForm(p => ({ ...p, amount: v }))}
-                placeholder="0.00"
-                keyboardType="numeric"
-              />
+                placeholder="0.00" keyboardType="numeric" />
               <View style={{ height: 12 }} />
             </ScrollView>
 
@@ -607,10 +663,7 @@ export default function FSETicketDetailScreen({ route, navigation }) {
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowBudgetModal(false)}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.submitBtn, { backgroundColor: colors.info }]}
-                onPress={submitBudgetRequest}
-              >
+              <TouchableOpacity style={[styles.submitBtn, { backgroundColor: colors.info }]} onPress={submitBudgetRequest}>
                 <Ionicons name="send" size={16} color="#fff" />
                 <Text style={styles.submitBtnText}>Submit Request</Text>
               </TouchableOpacity>
@@ -622,9 +675,8 @@ export default function FSETicketDetailScreen({ route, navigation }) {
   );
 }
 
-// ─── Helper Components ───────────────────────────────────────
-
-function Card({ icon, title, accent, children }) {
+// ─── Helper Components (theme passed via props) ──────────────
+function Card({ styles, colors, icon, title, accent, children }) {
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
@@ -636,7 +688,7 @@ function Card({ icon, title, accent, children }) {
   );
 }
 
-function Row({ label, value, last }) {
+function Row({ styles, label, value, last }) {
   return (
     <View style={[styles.row, !last && styles.rowBorder]}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -645,16 +697,15 @@ function Row({ label, value, last }) {
   );
 }
 
-function ActionBtn({ icon, label, color, outline, disabled, onPress }) {
+function ActionBtn({ styles, colors, icon, label, color, outline, disabled, onPress }) {
   return (
-    <TouchableOpacity
+    <PressableScale
       style={[
         styles.actionBtn,
         outline ? { backgroundColor: color + '18', borderWidth: 1.5, borderColor: color } : { backgroundColor: color },
         disabled && { opacity: 0.6 },
       ]}
       onPress={onPress}
-      activeOpacity={0.85}
       disabled={disabled}
     >
       {disabled
@@ -662,11 +713,11 @@ function ActionBtn({ icon, label, color, outline, disabled, onPress }) {
         : <Ionicons name={icon} size={19} color={outline ? color : '#fff'} />
       }
       <Text style={[styles.actionBtnText, { color: outline ? color : '#fff' }]}>{label}</Text>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
-function InfoBanner({ icon, color, bg, title, text }) {
+function InfoBanner({ styles, icon, color, bg, title, text }) {
   return (
     <View style={[styles.banner, { backgroundColor: bg }]}>
       <Ionicons name={icon} size={20} color={color} />
@@ -678,7 +729,7 @@ function InfoBanner({ icon, color, bg, title, text }) {
   );
 }
 
-function BudgetField({ label, icon, value, onChangeText, placeholder, multiline, keyboardType }) {
+function BudgetField({ styles, colors, label, icon, value, onChangeText, placeholder, multiline, keyboardType }) {
   return (
     <View style={styles.budgetField}>
       <Text style={styles.budgetLabel}>
@@ -698,25 +749,21 @@ function BudgetField({ label, icon, value, onChangeText, placeholder, multiline,
 }
 
 // ─── Styles ──────────────────────────────────────────────────
-const styles = StyleSheet.create({
+const makeStyles = (colors, spacing, radius, shadow) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg },
   header: {
-    paddingTop: 54, paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xl,
-    borderBottomLeftRadius: radius.xxl,
-    borderBottomRightRadius: radius.xxl,
+    paddingTop: 54, paddingHorizontal: spacing.xl, paddingBottom: spacing.xl,
+    borderBottomLeftRadius: radius.xxl, borderBottomRightRadius: radius.xxl,
   },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
   backBtn: {
     width: 42, height: 42, borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    justifyContent: 'center', alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.22)', justifyContent: 'center', alignItems: 'center',
   },
   headerBadge: {
     backgroundColor: 'rgba(255,255,255,0.22)',
-    paddingHorizontal: spacing.md, paddingVertical: 6,
-    borderRadius: radius.full,
+    paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.full,
   },
   headerBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   headerTicketNo: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '600' },
@@ -730,18 +777,30 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4, borderLeftColor: colors.primary,
   },
   scheduleBannerTitle: { fontSize: 13, fontWeight: '700', color: colors.primary },
-  scheduleBannerDate: { fontSize: 15, fontWeight: '800', color: colors.primaryDark, marginTop: 2 },
+  scheduleBannerDate: { fontSize: 15, fontWeight: '800', color: colors.text, marginTop: 2 },
 
   actionsCard: {
     backgroundColor: colors.surface, borderRadius: radius.lg,
     padding: spacing.lg, marginBottom: spacing.md,
-    ...shadow.sm, gap: spacing.sm,
+    borderWidth: 1, borderColor: colors.border, ...shadow.sm, gap: spacing.sm,
   },
   actionsTitle: { fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
+
+  // Stepper
+  stepper: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
+  stepItem: { alignItems: 'center', width: 58 },
+  stepDot: {
+    width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt, justifyContent: 'center', alignItems: 'center',
+  },
+  stepNum: { fontSize: 12, fontWeight: '800', color: colors.textLight },
+  stepLabel: { fontSize: 10, color: colors.textLight, marginTop: 4, fontWeight: '600' },
+  stepLine: { flex: 1, height: 2, backgroundColor: colors.border, marginBottom: 18 },
+
   inputGroup: { gap: 6 },
   inputLabel: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
   textarea: {
-    backgroundColor: colors.bg, borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt, borderRadius: radius.md,
     borderWidth: 1, borderColor: colors.border,
     padding: spacing.md, fontSize: 14, color: colors.text,
     minHeight: 72, textAlignVertical: 'top',
@@ -754,28 +813,17 @@ const styles = StyleSheet.create({
   divider: { alignItems: 'center', marginVertical: spacing.xs },
   dividerText: { fontSize: 11, fontWeight: '700', color: colors.textLight, letterSpacing: 1 },
 
-  // Request buttons
-  requestsRow: {
-    gap: spacing.sm, marginBottom: spacing.md,
-  },
+  requestsRow: { gap: spacing.sm, marginBottom: spacing.md },
   requestBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,
     backgroundColor: colors.surface, borderRadius: radius.lg,
-    padding: spacing.lg, ...shadow.sm,
+    padding: spacing.lg, borderWidth: 1, borderColor: colors.border, ...shadow.sm,
   },
-  requestBtnIcon: {
-    width: 44, height: 44, borderRadius: radius.md,
-    justifyContent: 'center', alignItems: 'center',
-  },
+  requestBtnIcon: { width: 44, height: 44, borderRadius: radius.md, justifyContent: 'center', alignItems: 'center' },
   requestBtnLabel: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.text },
-  requestCount: {
-    width: 22, height: 22, borderRadius: 11,
-    backgroundColor: colors.warning,
-    justifyContent: 'center', alignItems: 'center',
-  },
+  requestCount: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.warning, justifyContent: 'center', alignItems: 'center' },
   requestCountText: { color: '#fff', fontSize: 11, fontWeight: '800' },
 
-  // Requests list
   reqItem: { paddingVertical: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   reqItemBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
   reqPartRow: { fontSize: 13, color: colors.text, marginBottom: 2 },
@@ -786,10 +834,10 @@ const styles = StyleSheet.create({
   reqStatusPill: { paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.full, alignSelf: 'flex-start' },
   reqStatusText: { fontSize: 10, fontWeight: '800' },
 
-  // Cards
   card: {
     backgroundColor: colors.surface, borderRadius: radius.lg,
-    padding: spacing.lg, marginBottom: spacing.md, ...shadow.sm,
+    padding: spacing.lg, marginBottom: spacing.md,
+    borderWidth: 1, borderColor: colors.border, ...shadow.sm,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
   cardTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
@@ -797,10 +845,7 @@ const styles = StyleSheet.create({
   rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
   rowLabel: { fontSize: 13, color: colors.textMuted },
   rowValue: { fontSize: 13, color: colors.text, fontWeight: '600', flex: 1, textAlign: 'right', marginLeft: spacing.md },
-  typeTag: {
-    alignSelf: 'flex-start', paddingHorizontal: spacing.md,
-    paddingVertical: 5, borderRadius: radius.full, marginBottom: spacing.md,
-  },
+  typeTag: { alignSelf: 'flex-start', paddingHorizontal: spacing.md, paddingVertical: 5, borderRadius: radius.full, marginBottom: spacing.md },
   typeTagText: { fontSize: 12, fontWeight: '700' },
   concernDesc: { fontSize: 14, color: colors.text, lineHeight: 21 },
   banner: {
@@ -810,7 +855,6 @@ const styles = StyleSheet.create({
   bannerTitle: { fontSize: 13, fontWeight: '700', marginBottom: 2 },
   bannerText: { fontSize: 13, color: colors.text, lineHeight: 19 },
 
-  // Timeline
   timelineItem: { flexDirection: 'row', gap: spacing.md },
   timelineLeft: { alignItems: 'center', width: 12 },
   timelineDot: { width: 12, height: 12, borderRadius: 6, marginTop: 3 },
@@ -819,22 +863,18 @@ const styles = StyleSheet.create({
   timelineNote: { fontSize: 13, color: colors.text, lineHeight: 19 },
   timelineMeta: { fontSize: 11, color: colors.textLight, marginTop: 3 },
 
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   modalCard: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl,
     padding: spacing.xl, paddingBottom: 36, maxHeight: '90%',
   },
-  modalHandle: {
-    width: 40, height: 4, borderRadius: 2,
-    backgroundColor: colors.border, alignSelf: 'center', marginBottom: spacing.lg,
-  },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: spacing.lg },
   modalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
   modalTitle: { fontSize: 20, fontWeight: '800', color: colors.text },
   searchBox: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    backgroundColor: colors.bg, borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt, borderRadius: radius.md,
     borderWidth: 1, borderColor: colors.border,
     paddingHorizontal: spacing.md, marginBottom: spacing.md,
   },
@@ -845,52 +885,38 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   partRowSelected: { backgroundColor: colors.warningBg + '66' },
-  partCheck: {
-    width: 24, height: 24, borderRadius: 6, borderWidth: 2,
-    borderColor: colors.border, justifyContent: 'center', alignItems: 'center',
-  },
+  partCheck: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
   partCode: { fontSize: 13, fontWeight: '700', color: colors.text },
   partName: { fontSize: 13, color: colors.textMuted },
   partCategory: { fontSize: 11, color: colors.textLight },
   qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  qtyBtn: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: colors.warningBg,
-    justifyContent: 'center', alignItems: 'center',
-  },
+  qtyBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.warningBg, justifyContent: 'center', alignItems: 'center' },
   qtyText: { fontSize: 14, fontWeight: '700', color: colors.text, minWidth: 20, textAlign: 'center' },
-  selectedSummary: {
-    backgroundColor: colors.warningBg, borderRadius: radius.md,
-    padding: spacing.sm, marginTop: spacing.sm, alignItems: 'center',
-  },
+  selectedSummary: { backgroundColor: colors.warningBg, borderRadius: radius.md, padding: spacing.sm, marginTop: spacing.sm, alignItems: 'center' },
   selectedSummaryText: { fontSize: 13, fontWeight: '700', color: colors.warning },
   reasonInput: {
-    backgroundColor: colors.bg, borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt, borderRadius: radius.md,
     borderWidth: 1, borderColor: colors.border,
-    padding: spacing.md, fontSize: 14, color: colors.text,
-    marginTop: spacing.md,
+    padding: spacing.md, fontSize: 14, color: colors.text, marginTop: spacing.md,
   },
   modalActions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
   cancelBtn: {
     flex: 1, paddingVertical: 14, borderRadius: radius.md,
-    backgroundColor: colors.bg, alignItems: 'center',
+    backgroundColor: colors.surfaceAlt, alignItems: 'center',
     borderWidth: 1, borderColor: colors.border,
   },
   cancelBtnText: { fontSize: 15, fontWeight: '600', color: colors.textMuted },
   submitBtn: {
-    flex: 2, flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: spacing.sm,
+    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
     paddingVertical: 14, borderRadius: radius.md,
   },
   submitBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 
-  // Budget form
   budgetField: { marginBottom: spacing.md },
   budgetLabel: { fontSize: 13, fontWeight: '600', color: colors.textMuted, marginBottom: 6 },
   budgetInput: {
-    backgroundColor: colors.bg, borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt, borderRadius: radius.md,
     borderWidth: 1, borderColor: colors.border,
-    paddingHorizontal: spacing.md, paddingVertical: 12,
-    fontSize: 15, color: colors.text,
+    paddingHorizontal: spacing.md, paddingVertical: 12, fontSize: 15, color: colors.text,
   },
 });

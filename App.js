@@ -4,8 +4,19 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from './src/context/AuthContext';
 import { TicketProvider } from './src/context/TicketContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import SplashScreen from './src/screens/auth/SplashScreen';
+
+function ThemedApp() {
+  const { isDark } = useTheme();
+  return (
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <AppNavigator />
+    </>
+  );
+}
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
@@ -29,12 +40,13 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <AuthProvider>
-          <TicketProvider>
-            <StatusBar style="light" />
-            <AppNavigator />
-          </TicketProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <TicketProvider>
+              <ThemedApp />
+            </TicketProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Modal, ScrollView, Platform
+  Modal, ScrollView, Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useTickets } from '../../context/TicketContext';
+import { useTheme } from '../../context/ThemeContext';
 import { getStatusColor, getStatusBg, getStatusLabel } from '../../utils/ticketUtils';
-import { colors, spacing, radius, shadow } from '../../theme';
-
-const ACCENT = colors.fse;
+import { AnimatedCard, PressableScale, AnimatedCounter, FadeIn } from '../../components/Animated';
+import SideDrawer, { HamburgerButton } from '../../components/SideDrawer';
 
 const MONTHS = [
   'All Months', 'January', 'February', 'March', 'April',
@@ -31,15 +32,19 @@ const SORT_OPTIONS = [
 ];
 
 export default function FSEDashboard({ navigation }) {
+  const { colors, spacing, radius, shadow, isDark, toggleTheme } = useTheme();
+  const ACCENT = colors.fse;
+  const styles = React.useMemo(() => makeStyles(colors, spacing, radius, shadow, ACCENT), [colors]);
+
   const { user, logout } = useAuth();
   const { getTicketsByFSE } = useTickets();
 
   const [showFilter, setShowFilter] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterMonth, setFilterMonth] = useState('All Months');
   const [sortBy, setSortBy] = useState('newest');
 
-  // Temporary filter state (inside sidebar — only applied on "Apply")
   const [tempStatus, setTempStatus] = useState('ALL');
   const [tempMonth, setTempMonth] = useState('All Months');
   const [tempSort, setTempSort] = useState('newest');
@@ -48,22 +53,16 @@ export default function FSEDashboard({ navigation }) {
 
   const applyFilters = (tickets) => {
     let result = [...tickets];
-
-    // Status filter
     if (filterStatus !== 'ALL') {
       result = result.filter(t => t.status === filterStatus);
     }
-
-    // Month filter
     if (filterMonth !== 'All Months') {
-      const monthIndex = MONTHS.indexOf(filterMonth); // 1-based
+      const monthIndex = MONTHS.indexOf(filterMonth);
       result = result.filter(t => {
         const date = t.createdAt instanceof Date ? t.createdAt : new Date(t.createdAt);
         return date.getMonth() + 1 === monthIndex;
       });
     }
-
-    // Sort
     result.sort((a, b) => {
       const da = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
       const db = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
@@ -76,7 +75,6 @@ export default function FSEDashboard({ navigation }) {
       }
       return 0;
     });
-
     return result;
   };
 
@@ -88,15 +86,23 @@ export default function FSEDashboard({ navigation }) {
     sortBy !== 'newest',
   ].filter(Boolean).length;
 
-  const stats = {
-    assigned: myTickets.filter(t => t.status === 'ASSIGNED_FSE').length,
-    onsite: myTickets.filter(t => t.status === 'ONSITE').length,
-    pending: myTickets.filter(t => t.status === 'SERVICE_PENDING').length,
-    done: myTickets.filter(t => t.status === 'CLOSED').length,
+  const statCards = [
+    { key: 'assigned', label: 'Assigned', value: myTickets.filter(t => t.status === 'ASSIGNED_FSE').length, icon: 'clipboard', gradient: colors.gradientInfo },
+    { key: 'onsite', label: 'Onsite', value: myTickets.filter(t => t.status === 'ONSITE').length, icon: 'car', gradient: colors.gradientWarning },
+    { key: 'pending', label: 'Pending', value: myTickets.filter(t => t.status === 'SERVICE_PENDING').length, icon: 'hourglass', gradient: colors.gradientDanger },
+    { key: 'done', label: 'Done', value: myTickets.filter(t => t.status === 'CLOSED').length, icon: 'checkmark-done', gradient: colors.gradientSuccess },
+  ];
+
+  const initials = (user?.name || 'U').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+
+  const confirmLogout = () => {
+    Alert.alert('Account', `Signed in as ${user?.name}`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log Out', style: 'destructive', onPress: logout },
+    ]);
   };
 
   const openFilter = () => {
-    // Sync temp state with current applied filters
     setTempStatus(filterStatus);
     setTempMonth(filterMonth);
     setTempSort(sortBy);
@@ -116,58 +122,73 @@ export default function FSEDashboard({ navigation }) {
     setTempSort('newest');
   };
 
-  const renderTicket = ({ item }) => (
-    <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('FSETicketDetail', { ticketId: item.id })}>
-      <View style={styles.card}>
-        <View style={[styles.statusStripe, { backgroundColor: getStatusColor(item.status) }]} />
-        <View style={styles.cardBody}>
-          <View style={styles.cardTop}>
-            <Text style={styles.ticketNo}>{item.ticketNo}</Text>
-            <View style={[styles.statusPill, { backgroundColor: getStatusBg(item.status) }]}>
-              <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.status) }]} />
-              <Text style={[styles.statusPillText, { color: getStatusColor(item.status) }]}>
-                {getStatusLabel(item.status)}
-              </Text>
+  const renderTicket = ({ item, index }) => (
+    <AnimatedCard index={index}>
+      <PressableScale onPress={() => navigation.navigate('FSETicketDetail', { ticketId: item.id })}>
+        <View style={styles.card}>
+          <View style={[styles.statusStripe, { backgroundColor: getStatusColor(item.status) }]} />
+          <View style={styles.cardBody}>
+            <View style={styles.cardTop}>
+              <Text style={styles.ticketNo}>{item.ticketNo}</Text>
+              <View style={[styles.statusPill, { backgroundColor: getStatusBg(item.status) }]}>
+                <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.status) }]} />
+                <Text style={[styles.statusPillText, { color: getStatusColor(item.status) }]}>
+                  {getStatusLabel(item.status)}
+                </Text>
+              </View>
             </View>
-          </View>
-          <Text style={styles.clientName}>{item.clientName}</Text>
-          <Text style={styles.concern} numberOfLines={2}>{item.concern}</Text>
-          {item.scheduledDate && (
-            <View style={styles.scheduleChip}>
-              <Ionicons name="calendar" size={13} color={ACCENT} />
-              <Text style={styles.scheduleText}>{item.scheduledDate}</Text>
+            <Text style={styles.clientName}>{item.clientName}</Text>
+            <Text style={styles.concern} numberOfLines={2}>{item.concern}</Text>
+            {item.scheduledDate && (
+              <View style={styles.scheduleChip}>
+                <Ionicons name="calendar" size={13} color={ACCENT} />
+                <Text style={styles.scheduleText}>{item.scheduledDate}</Text>
+              </View>
+            )}
+            <View style={styles.addressRow}>
+              <Ionicons name="location-outline" size={13} color={colors.textLight} />
+              <Text style={styles.address} numberOfLines={1}>{item.clientAddress || 'No address'}</Text>
             </View>
-          )}
-          <View style={styles.addressRow}>
-            <Ionicons name="location-outline" size={13} color={colors.textLight} />
-            <Text style={styles.address} numberOfLines={1}>{item.clientAddress || 'No address'}</Text>
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </PressableScale>
+    </AnimatedCard>
   );
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.greeting}>Field Engineer</Text>
-            <Text style={styles.userName}>{user?.name}</Text>
+      {/* Gradient Header */}
+      <LinearGradient
+        colors={[ACCENT, isDark ? '#065F46' : '#047857']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <FadeIn>
+          <View style={styles.headerTop}>
+            <HamburgerButton onPress={() => setDrawerOpen(true)} style={styles.iconBtn} />
+            <View style={{ flex: 1, marginLeft: spacing.md }}>
+              <Text style={styles.greeting}>Field Engineer</Text>
+              <Text style={styles.userName}>{user?.name}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setDrawerOpen(true)} style={styles.avatar} activeOpacity={0.8}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-            <Ionicons name="log-out-outline" size={22} color="#fff" />
-          </TouchableOpacity>
-        </View>
+        </FadeIn>
 
         <View style={styles.statsRow}>
-          <StatCard icon="clipboard-outline" label="Assigned" value={stats.assigned} />
-          <StatCard icon="car-outline" label="Onsite" value={stats.onsite} />
-          <StatCard icon="hourglass-outline" label="Pending" value={stats.pending} />
-          <StatCard icon="checkmark-done-outline" label="Done" value={stats.done} />
+          {statCards.map((s, i) => (
+            <AnimatedCard key={s.key} index={i} style={{ flex: 1 }}>
+              <View style={styles.statCard}>
+                <Ionicons name={s.icon} size={16} color="#fff" />
+                <AnimatedCounter value={s.value} style={styles.statValue} delay={200 + i * 70} />
+                <Text style={styles.statLabel}>{s.label}</Text>
+              </View>
+            </AnimatedCard>
+          ))}
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Toolbar */}
       <View style={styles.toolbar}>
@@ -175,36 +196,28 @@ export default function FSEDashboard({ navigation }) {
           {filtered.length} ticket{filtered.length !== 1 ? 's' : ''}
           {filterStatus !== 'ALL' || filterMonth !== 'All Months' ? ' (filtered)' : ''}
         </Text>
-        <TouchableOpacity style={styles.filterBtn} onPress={openFilter} activeOpacity={0.8}>
+        <PressableScale style={[styles.filterBtn, activeFilterCount > 0 && { backgroundColor: ACCENT }]} onPress={openFilter}>
           <Ionicons name="options-outline" size={18} color={activeFilterCount > 0 ? '#fff' : ACCENT} />
-          <Text style={[styles.filterBtnText, activeFilterCount > 0 && { color: '#fff' }]}>
-            Filter
-          </Text>
+          <Text style={[styles.filterBtnText, activeFilterCount > 0 && { color: '#fff' }]}>Filter</Text>
           {activeFilterCount > 0 && (
             <View style={styles.filterBadge}>
               <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
             </View>
           )}
-        </TouchableOpacity>
+        </PressableScale>
       </View>
 
       {/* Active filter pills */}
       {(filterStatus !== 'ALL' || filterMonth !== 'All Months') && (
         <View style={styles.activePills}>
           {filterStatus !== 'ALL' && (
-            <TouchableOpacity
-              style={styles.activePill}
-              onPress={() => setFilterStatus('ALL')}
-            >
+            <TouchableOpacity style={styles.activePill} onPress={() => setFilterStatus('ALL')}>
               <Text style={styles.activePillText}>{getStatusLabel(filterStatus)}</Text>
               <Ionicons name="close" size={13} color={ACCENT} />
             </TouchableOpacity>
           )}
           {filterMonth !== 'All Months' && (
-            <TouchableOpacity
-              style={styles.activePill}
-              onPress={() => setFilterMonth('All Months')}
-            >
+            <TouchableOpacity style={styles.activePill} onPress={() => setFilterMonth('All Months')}>
               <Text style={styles.activePillText}>{filterMonth}</Text>
               <Ionicons name="close" size={13} color={ACCENT} />
             </TouchableOpacity>
@@ -235,17 +248,19 @@ export default function FSEDashboard({ navigation }) {
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalBackdrop} onPress={() => setShowFilter(false)} />
           <View style={styles.sidebar}>
-            {/* Sidebar Header */}
-            <View style={styles.sidebarHeader}>
+            <LinearGradient
+              colors={[ACCENT, isDark ? '#065F46' : '#047857']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.sidebarHeader}
+            >
               <Text style={styles.sidebarTitle}>Filter Tickets</Text>
               <TouchableOpacity onPress={() => setShowFilter(false)} style={styles.sidebarClose}>
-                <Ionicons name="close" size={22} color={colors.text} />
+                <Ionicons name="close" size={22} color="#fff" />
               </TouchableOpacity>
-            </View>
+            </LinearGradient>
 
             <ScrollView showsVerticalScrollIndicator={false} style={styles.sidebarScroll}>
-
-              {/* Status */}
               <Text style={styles.sidebarLabel}>
                 <Ionicons name="ellipse-outline" size={14} /> Status
               </Text>
@@ -259,15 +274,12 @@ export default function FSEDashboard({ navigation }) {
                       onPress={() => setTempStatus(s.key)}
                     >
                       <Ionicons name={s.icon} size={18} color={active ? '#fff' : colors.textMuted} />
-                      <Text style={[styles.statusOptionText, active && { color: '#fff' }]}>
-                        {s.label}
-                      </Text>
+                      <Text style={[styles.statusOptionText, active && { color: '#fff' }]}>{s.label}</Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
 
-              {/* Month */}
               <Text style={styles.sidebarLabel}>
                 <Ionicons name="calendar-outline" size={14} /> Month
               </Text>
@@ -288,24 +300,17 @@ export default function FSEDashboard({ navigation }) {
                 })}
               </View>
 
-              {/* Sort */}
               <Text style={styles.sidebarLabel}>
                 <Ionicons name="swap-vertical-outline" size={14} /> Sort By
               </Text>
               {SORT_OPTIONS.map(s => {
                 const active = tempSort === s.key;
                 return (
-                  <TouchableOpacity
-                    key={s.key}
-                    style={styles.sortRow}
-                    onPress={() => setTempSort(s.key)}
-                  >
+                  <TouchableOpacity key={s.key} style={styles.sortRow} onPress={() => setTempSort(s.key)}>
                     <View style={[styles.radioCircle, active && { borderColor: ACCENT }]}>
                       {active && <View style={[styles.radioDot, { backgroundColor: ACCENT }]} />}
                     </View>
-                    <Text style={[styles.sortLabel, active && { color: ACCENT, fontWeight: '700' }]}>
-                      {s.label}
-                    </Text>
+                    <Text style={[styles.sortLabel, active && { color: ACCENT, fontWeight: '700' }]}>{s.label}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -313,7 +318,6 @@ export default function FSEDashboard({ navigation }) {
               <View style={{ height: 20 }} />
             </ScrollView>
 
-            {/* Sidebar Footer */}
             <View style={styles.sidebarFooter}>
               <TouchableOpacity style={styles.resetBtn} onPress={resetFilter}>
                 <Text style={styles.resetBtnText}>Reset All</Text>
@@ -325,24 +329,20 @@ export default function FSEDashboard({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      <SideDrawer
+        visible={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        accent={colors.fse}
+        headerGradient={[colors.fse, isDark ? '#065F46' : '#047857']}
+      />
     </View>
   );
 }
 
-function StatCard({ icon, label, value }) {
-  return (
-    <View style={styles.statCard}>
-      <Ionicons name={icon} size={16} color="#fff" />
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
+const makeStyles = (colors, spacing, radius, shadow, ACCENT) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   header: {
-    backgroundColor: ACCENT,
     paddingTop: 54, paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xl,
     borderBottomLeftRadius: radius.xxl,
@@ -351,14 +351,20 @@ const styles = StyleSheet.create({
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   greeting: { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '500' },
   userName: { fontSize: 22, fontWeight: '800', color: '#fff', marginTop: 2 },
-  logoutBtn: {
-    width: 42, height: 42, borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    justifyContent: 'center', alignItems: 'center',
+  headerActions: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
+  iconBtn: {
+    width: 42, height: 42, borderRadius: radius.full,
+    backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center',
   },
+  avatar: {
+    width: 42, height: 42, borderRadius: radius.full,
+    backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.5)',
+  },
+  avatarText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl },
   statCard: {
-    flex: 1, backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: radius.md, padding: spacing.md, alignItems: 'center',
   },
   statValue: { fontSize: 20, fontWeight: '800', color: '#fff', marginTop: 4 },
@@ -370,7 +376,7 @@ const styles = StyleSheet.create({
   resultCount: { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
   filterBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: colors.successBg,
+    backgroundColor: colors.surface,
     borderWidth: 1.5, borderColor: ACCENT,
     paddingHorizontal: spacing.lg, paddingVertical: 8,
     borderRadius: radius.full,
@@ -387,7 +393,7 @@ const styles = StyleSheet.create({
   },
   activePill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: colors.successBg, borderWidth: 1, borderColor: ACCENT,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: ACCENT,
     paddingHorizontal: spacing.md, paddingVertical: 5, borderRadius: radius.full,
   },
   activePillText: { fontSize: 12, color: ACCENT, fontWeight: '600' },
@@ -395,7 +401,7 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row', backgroundColor: colors.surface,
     borderRadius: radius.lg, marginBottom: spacing.md,
-    overflow: 'hidden', ...shadow.sm,
+    overflow: 'hidden', borderWidth: 1, borderColor: colors.border, ...shadow.sm,
   },
   statusStripe: { width: 4 },
   cardBody: { flex: 1, padding: spacing.lg },
@@ -421,9 +427,8 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 80, gap: spacing.sm },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.textMuted },
   emptySubtitle: { fontSize: 13, color: colors.textLight },
-  // Modal / Sidebar
   modalOverlay: { flex: 1, flexDirection: 'row' },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.4)' },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
   sidebar: {
     width: 300, backgroundColor: colors.surface,
     ...shadow.lg, paddingBottom: 0,
@@ -431,8 +436,6 @@ const styles = StyleSheet.create({
   sidebarHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: spacing.xl, paddingTop: 54, paddingBottom: spacing.lg,
-    borderBottomWidth: 1, borderBottomColor: colors.border,
-    backgroundColor: ACCENT,
   },
   sidebarTitle: { fontSize: 18, fontWeight: '800', color: '#fff' },
   sidebarClose: {
