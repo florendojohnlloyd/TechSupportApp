@@ -261,8 +261,13 @@ export default function FSETicketDetailScreen({ route, navigation }) {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
-          <View style={styles.headerBadge}>
-            <Text style={styles.headerBadgeText}>{getStatusLabel(ticket.status)}</Text>
+          <View style={styles.headerRight}>
+            <View style={styles.headerBadge}>
+              <Text style={styles.headerBadgeText}>{getStatusLabel(ticket.status)}</Text>
+            </View>
+            <TouchableOpacity onPress={() => navigation.popToTop()} style={styles.homeBtn}>
+              <Ionicons name="home" size={20} color="#fff" />
+            </TouchableOpacity>
           </View>
         </View>
         <Text style={styles.headerTicketNo}>{ticket.ticketNo}</Text>
@@ -758,6 +763,11 @@ const makeStyles = (colors, spacing, radius, shadow) => StyleSheet.create({
   },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
   backBtn: {
+    width: 42, height: 42, borderRadius: radius.md,
+    backgroundColor: 'rgba(255,255,255,0.22)', justifyContent: 'center', alignItems: 'center',
+  },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  homeBtn: {
     width: 42, height: 42, borderRadius: radius.md,
     backgroundColor: 'rgba(255,255,255,0.22)', justifyContent: 'center', alignItems: 'center',
   },

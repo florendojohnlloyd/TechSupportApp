@@ -51,8 +51,13 @@ export default function TicketDetailScreen({ route, navigation }) {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
-          <View style={styles.headerBadge}>
-            <Text style={styles.headerBadgeText}>{getStatusLabel(ticket.status)}</Text>
+          <View style={styles.headerRight}>
+            <View style={styles.headerBadge}>
+              <Text style={styles.headerBadgeText}>{getStatusLabel(ticket.status)}</Text>
+            </View>
+            <TouchableOpacity onPress={() => navigation.popToTop()} style={styles.homeBtn}>
+              <Ionicons name="home" size={20} color="#fff" />
+            </TouchableOpacity>
           </View>
         </View>
         <Text style={styles.headerTicketNo}>{ticket.ticketNo}</Text>
@@ -168,6 +173,8 @@ const makeStyles = (colors, spacing, radius, shadow) => StyleSheet.create({
   header: { paddingTop: 54, paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, borderBottomLeftRadius: radius.xxl, borderBottomRightRadius: radius.xxl },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
   backBtn: { width: 42, height: 42, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.22)', justifyContent: 'center', alignItems: 'center' },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  homeBtn: { width: 42, height: 42, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.22)', justifyContent: 'center', alignItems: 'center' },
   headerBadge: { backgroundColor: 'rgba(255,255,255,0.22)', paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.full },
   headerBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   headerTicketNo: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '600', letterSpacing: 0.3 },

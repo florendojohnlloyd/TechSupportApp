@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  KeyboardAvoidingView, Platform, ScrollView, TextInput,
+  KeyboardAvoidingView, Platform, ScrollView, TextInput, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -58,17 +58,9 @@ export default function LoginScreen() {
         {/* Brand */}
         <FadeIn delay={80}>
           <View style={styles.brand}>
-            <LinearGradient
-              colors={colors.gradientPrimary}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.logoBox}
-            >
-              <Ionicons name="build" size={36} color="#fff" />
-            </LinearGradient>
-            <Text style={styles.brandTitle}>
-              Tech<Text style={{ color: colors.primary }}>Support</Text>
-            </Text>
+            <View style={styles.logoChip}>
+              <Image source={require('../../../assets/brand-logo.png')} style={styles.logoImg} resizeMode="contain" />
+            </View>
             <Text style={styles.brandSub}>Fast Help. Better Support.</Text>
           </View>
         </FadeIn>
@@ -162,12 +154,12 @@ const makeStyles = (colors, spacing, radius, shadow) => StyleSheet.create({
   },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: spacing.xxl },
   brand: { alignItems: 'center', marginBottom: spacing.xxxl },
-  logoBox: {
-    width: 80, height: 80, borderRadius: radius.xl,
-    justifyContent: 'center', alignItems: 'center',
+  logoChip: {
+    backgroundColor: '#FFFFFF', borderRadius: radius.xl,
+    paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
     marginBottom: spacing.lg, ...shadow.glow(colors.primary),
   },
-  brandTitle: { fontSize: 30, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
+  logoImg: { width: 220, height: 72 },
   brandSub: { fontSize: 14, color: colors.textMuted, marginTop: 4 },
   card: {
     backgroundColor: colors.surface, borderRadius: radius.xxl, padding: spacing.xxl,
